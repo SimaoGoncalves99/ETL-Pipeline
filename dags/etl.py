@@ -1,24 +1,27 @@
 from airflow import DAG
-from airflow.providfers.http.operators.http import SimpleHttpOperator
+from airflow.providers.http.operators.http import SimpleHttpOperator
 from airflow.decorators import task
-from airflow.providers.postgresql.hooks.postgres import (
-    PostgresHook,
-)  # Send data to Postgres
+from airflow.providers.postgres.hooks.postgres import PostgresHook
 from airflow.utils.dates import days_ago
 import json
 
-##Define the DAG
+
+## Define the DAG
 with DAG(
     dag_id="nasa_apod_postgres",
     start_date=days_ago(1),
     schedule_interval="@daily",
     catchup=False,
 ) as dag:
-    ## Step 1: Create the table if it does not exist
+
+    ## step 1: Create the table if it doesnt exists
+
+    @task
     def create_table():
-        ##Initialize the Postgreshook
+        ## initialize the Postgreshook
         postgres_hook = PostgresHook(postgres_conn_id="my_postgres_connection")
-        ##SQL query to create the table
+
+        ## SQL query to create the table
         create_table_query = """
         CREATE TABLE IF NOT EXISTS apod_data (
             id SERIAL PRIMARY KEY,
@@ -26,24 +29,28 @@ with DAG(
             explanation TEXT,
             url TEXT,
             date DATE,
-            media_type VARCHAR(50),
+            media_type VARCHAR(50)
         );
+
+
         """
-        ##Execute the table creation query
+        ## Execute the table creation query
         postgres_hook.run(create_table_query)
 
-    ## Step 2: Extract the NASA API Data (APOD) - Astronomy Picture of the Day[Extract Pipeline]
-    ## https://api.nasa.gov/planetary/apod?api_key=CX29eEtrdrvk1fLGEikPiMapwlXfScQ5TjFyuMXY
+    ## Step 2: Extract the NASA API Data(APOD)-Astronomy Picture of the Day[Extract pipeline]
+    ## https://api.nasa.gov/planetary/apod?api_key=7BbRvxo8uuzas9U3ho1RwHQQCkZIZtJojRIr293q
     extract_apod = SimpleHttpOperator(
-        task_id="fetch_apod_data",
-        http_onn_id="nasa_api",
-        endpoint="planetary/apod?api_key=DEMO_KEY",
+        task_id="extract_apod",
+        http_conn_id="nasa_api",  ## Connection ID Defined In Airflow For NASA API
+        endpoint="planetary/apod",  ## NASA API enpoint for APOD
         method="GET",
-        data={"api_key": "{{conn.nasa_api.extra_dejson.api_key}}"},
-        response_filter=lambda response: response.json(),
-    )  ## Convert response to json) ##Use the API key from the connection
+        data={
+            "api_key": "{{ conn.nasa_api.extra_dejson.api_key}}"
+        },  ## USe the API Key from the connection
+        response_filter=lambda response: response.json(),  ## Convert response to json
+    )
 
-    ##Step 3: Transform the data (Pick the information that I need to save)
+    ## Step 3: Transform the data(Pick the information that i need to save)
     @task
     def transform_apod_data(response):
         apod_data = {
@@ -55,19 +62,21 @@ with DAG(
         }
         return apod_data
 
-    ##Step 4:Load the data into PostgreSQL
+    ## step 4:  Load the data into Postgres SQL
     @task
     def load_data_to_postgres(apod_data):
-        ##Initialize the Postgreshook
+        ## Initialize the PostgresHook
         postgres_hook = PostgresHook(postgres_conn_id="my_postgres_connection")
 
-        ##Define the SQL insert query data
+        ## Define the SQL Insert Query
 
         insert_query = """
         INSERT INTO apod_data (title, explanation, url, date, media_type)
-        VALUES (%s, %s, %s, %s, %s)
+        VALUES (%s, %s, %s, %s, %s);
         """
-        ##Execute the insert query with the data
+
+        ## Execute the SQL Query
+
         postgres_hook.run(
             insert_query,
             parameters=(
@@ -79,20 +88,15 @@ with DAG(
             ),
         )
 
-    ##Step 5: Verify the data in DBViewer
-    fetch_apod_data = SimpleHttpOperator(
-        task_id="fetch_apod_data",
-        http_conn_id="nasa_api",
-        endpoint="planetary/apod?api_key=DEMO_KEY",
-        method="GET",
-        response_check=lambda response: "url" in response.text,
-        log_response=True,
-    )
+    ## step 5: Verify the data DBViewer
 
-    ##Step 6: Define the task dependencies
+    ## step 6: Define the task dependencies
+    ## Extract
     (
         create_table() >> extract_apod
-    )  ##Ensure the table is created before extraction
+    )  ## Ensure the table is create befor extraction
     api_response = extract_apod.output
+    ## Transform
     transformed_data = transform_apod_data(api_response)
+    ## Load
     load_data_to_postgres(transformed_data)

@@ -17,3 +17,5 @@ services:
 networks:
   airflow_network:
     external: false
+
+volumes: postgres_data
