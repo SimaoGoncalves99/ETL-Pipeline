@@ -1,2 +1,6 @@
+airflow:
+    expose_port: "True"
+local:
+    registry: 0.0.0.0:5555
 project:
     name: etl-project
