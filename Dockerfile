@@ -1,1 +1,1 @@
-FROM quay.io/astronomer/astro-runtime:13.0.0-python-3.11
+FROM quay.io/astronomer/astro-runtime:12.1.1
