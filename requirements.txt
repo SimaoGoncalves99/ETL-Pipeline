@@ -1,3 +1,1 @@
 pytest==8.3.5
-
-astro-run-dag # This package is needed for the astro run command. It will be removed before a deploy
