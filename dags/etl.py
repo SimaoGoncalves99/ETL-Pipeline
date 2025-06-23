@@ -1,17 +1,29 @@
 from airflow import DAG
-from airflow.providers.http.operators.http import SimpleHttpOperator
+from airflow.providers.http.operators.http import HttpOperator
 from airflow.decorators import task
 from airflow.providers.postgres.hooks.postgres import PostgresHook
-from airflow.utils.dates import days_ago
+from airflow.utils import timezone
+from datetime import datetime, timedelta
+
 import json
 
-print("DAG loaded")
+def days_ago(n, hour=0, minute=0, second=0, microsecond=0):
+    """
+    Get a datetime object representing `n` days ago. By default the time is
+    set to midnight.
+    """
+    today = timezone.utcnow().replace(
+        hour=hour,
+        minute=minute,
+        second=second,
+        microsecond=microsecond)
+    return today - timedelta(days=n)
 
 ## Define the DAG
 with DAG(
     dag_id="nasa_apod_postgres",
     start_date=days_ago(1),
-    schedule_interval="@daily",
+    schedule="@daily",
     catchup=False,
 ) as dag:
 
@@ -39,7 +51,7 @@ with DAG(
         postgres_hook.run(create_table_query)
 
     ## Step 2: Extract the NASA API Data(APOD)-Astronomy Picture of the Day[Extract pipeline]
-    extract_apod = SimpleHttpOperator(
+    extract_apod = HttpOperator(
         task_id="extract_apod",
         http_conn_id="nasa_api",  ## Connection ID Defined In Airflow For NASA API
         endpoint="planetary/apod",  ## NASA API enpoint for APOD
