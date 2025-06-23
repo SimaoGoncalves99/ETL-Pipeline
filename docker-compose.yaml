@@ -50,15 +50,18 @@ x-airflow-common:
   # Comment the image line, place your Dockerfile in the directory where you placed the docker-compose.yaml
   # and uncomment the "build" line below, Then run `docker-compose build` to build the images.
   #image: ${AIRFLOW_IMAGE_NAME:-apache/airflow:3.0.2}
-  build: .
+  build:
+    context: .
+    dockerfile: ./Dockerfile
   image: etl-dag:${VERSION}
   environment:
     &airflow-common-env
     AIRFLOW__CORE__EXECUTOR: CeleryExecutor
     AIRFLOW__CORE__AUTH_MANAGER: airflow.providers.fab.auth_manager.fab_auth_manager.FabAuthManager
-    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://postgres:postgres@postgres/airflow
-    AIRFLOW__CELERY__RESULT_BACKEND: db+postgresql://postgres:postgres@postgres/airflow
+    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://postgres:postgres@postgres/postgres
+    AIRFLOW__CELERY__RESULT_BACKEND: db+postgresql://postgres:postgres@postgres/postgres
     AIRFLOW__CELERY__BROKER_URL: redis://:@redis:6379/0
+    AIRFLOW__API_AUTH__JWT_SECRET: ${RANDOM_LONG_STRING}
     AIRFLOW__CORE__FERNET_KEY: ''
     AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'true'
     AIRFLOW__CORE__LOAD_EXAMPLES: 'true'
@@ -98,10 +101,8 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-    networks:
-      - airflow_network
     healthcheck:
-      test: ["CMD", "pg_isready", "-U", "airflow"]
+      test: ["CMD", "pg_isready", "-U", "postgres"]
       interval: 10s
       retries: 5
       start_period: 5s
@@ -337,9 +338,5 @@ services:
       airflow-init:
         condition: service_completed_successfully
 
-networks:
-  airflow_network:
-    external: false
-
 volumes:
-  postgres-db-volume:
+  postgres_data:

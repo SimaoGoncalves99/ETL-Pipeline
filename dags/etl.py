@@ -5,6 +5,7 @@ from airflow.providers.postgres.hooks.postgres import PostgresHook
 from airflow.utils.dates import days_ago
 import json
 
+print("DAG loaded")
 
 ## Define the DAG
 with DAG(
