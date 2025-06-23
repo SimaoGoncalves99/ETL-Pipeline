@@ -1,1 +1,3 @@
-FROM quay.io/astronomer/astro-runtime:12.6.0
+FROM apache/airflow:3.0.2
+
+COPY --chown=airflow:root dags/etl.py /opt/airflow/dags
