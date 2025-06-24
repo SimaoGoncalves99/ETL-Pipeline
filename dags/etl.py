@@ -1,16 +1,15 @@
-from airflow import DAG
-from airflow.providers.http.operators.http import SimpleHttpOperator
+from airflow.sdk import DAG
+from airflow.providers.http.operators.http import HttpOperator
 from airflow.decorators import task
 from airflow.providers.postgres.hooks.postgres import PostgresHook
-from airflow.utils.dates import days_ago
-import json
+import pendulum
 
 
 ## Define the DAG
 with DAG(
     dag_id="nasa_apod_postgres",
-    start_date=days_ago(1),
-    schedule_interval="@daily",
+    start_date=pendulum.now(tz="UTC"),
+    schedule="@daily",
     catchup=False,
 ) as dag:
 
@@ -38,7 +37,7 @@ with DAG(
         postgres_hook.run(create_table_query)
 
     ## Step 2: Extract the NASA API Data(APOD)-Astronomy Picture of the Day[Extract pipeline]
-    extract_apod = SimpleHttpOperator(
+    extract_apod = HttpOperator(
         task_id="extract_apod",
         http_conn_id="nasa_api",  ## Connection ID Defined In Airflow For NASA API
         endpoint="planetary/apod",  ## NASA API enpoint for APOD
@@ -75,10 +74,11 @@ with DAG(
         """
 
         ## Execute the SQL Query
-
-        postgres_hook.run(
+        conn = postgres_hook.get_conn()
+        cursor = conn.cursor()
+        cursor.execute(
             insert_query,
-            parameters=(
+            (
                 apod_data["title"],
                 apod_data["explanation"],
                 apod_data["url"],
@@ -86,6 +86,9 @@ with DAG(
                 apod_data["media_type"],
             ),
         )
+        conn.commit()
+        cursor.close()
+        conn.close()
 
     ## step 5: Verify the data DBViewer
 
